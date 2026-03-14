@@ -1,32 +1,53 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 
-interface StyleOption {
-  id: string;
-  name: string;
-  description: string;
-  preview: string;
-}
+const GENERATION_LIMIT = 2;
+const ONE_HOUR = 60 * 60 * 1000;
 
-const styleOptions: StyleOption[] = [
-  { id: 'business', name: '商务正装', description: '专业商务风格,适合职场', preview: '👔' },
-  { id: 'casual', name: '休闲风格', description: '轻松自然,适合日常', preview: '👕' },
-  { id: 'official', name: '正式证件', description: '标准证件照,官方认可', preview: '📋' },
-  { id: 'smiling', name: '微笑证件', description: '微笑自然,亲和力强', preview: '😊' },
-  { id: 'white-bg', name: '白色背景', description: '纯白背景,简洁大方', preview: '⬜' },
-  { id: 'blue-bg', name: '蓝色背景', description: '蓝色背景,经典证件', preview: '🟦' },
-];
+interface GenerationRecord {
+  count: number;
+  resetTime: number;
+}
 
 export default function Home() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [selectedStyle, setSelectedStyle] = useState<string>('official');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [remainingGenerations, setRemainingGenerations] = useState(2);
+
+  const checkGenerationLimit = useCallback(() => {
+    const stored = localStorage.getItem('generationRecord');
+    if (!stored) {
+      return GENERATION_LIMIT;
+    }
+    
+    const record: GenerationRecord = JSON.parse(stored);
+    const now = Date.now();
+    
+    if (now >= record.resetTime) {
+      localStorage.setItem('generationRecord', JSON.stringify({
+        count: 0,
+        resetTime: now + ONE_HOUR
+      }));
+      return GENERATION_LIMIT;
+    }
+    
+    return Math.max(0, GENERATION_LIMIT - record.count);
+  }, []);
+
+  useEffect(() => {
+    setRemainingGenerations(checkGenerationLimit());
+  }, [checkGenerationLimit]);
+
+  const promptMap = {
+    male: '生成一张现代感的职业形象照，整体风格参考商务人像。画面为上半身构图，背景使用带有轻微纹理的深蓝色渐变摄影棚背景，灯光柔和自然，突出真实肤色与层次感。画面清晰高质，面部保持对焦，背景轻微虚化以营造空间感和专业氛围，皮肤质感通透气色好，头肩比要正常适度。人物头部及五官不要有任何改变，整个脸部发型全部保留原状，服装为黑色西装外套，里面为白色衬衫，设计简约干练，整体气质现代且优雅，神情放松，自然自信，眼神明亮有神，微笑真诚。整体画面应传达干净、精致、专业的感觉，适合作为商务与职业形象照。尺寸比例1：1！不要改变五官！保持健康自信有活力的状态。',
+    female: '生成一张高智感职业证件照，背景深蓝色，生成一张现代感的职业形象照，整体风格参考商务人像。画面为上半身构图，背景使用带有轻微纹理的深蓝色渐变摄影棚背景，灯光柔和自然，突出真实肤色与层次感。画面清晰高质，面部保持对焦，背景轻微虚化以营造空间感和专业氛围，皮肤质感通透气色好，头肩比要正常适度。人物头部及五官不要有任何改变，整个脸部发型全部保留原状，服装为无袖黑色职业连衣裙，设计简约干练，整体气质现代且优雅，神情放松，自然自信，眼神明亮有神，微笑真诚。整体画面应传达干净、精致、专业的感觉，适合作为商务与职业形象照。尺寸比例1：1！不要改变五官！保持健康自信有活力的状态。',
+  };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -70,6 +91,12 @@ export default function Home() {
       return;
     }
 
+    const remaining = checkGenerationLimit();
+    if (remaining <= 0) {
+      setError('额度不足，请联系管理员胡小琪充值');
+      return;
+    }
+
     setIsGenerating(true);
     setError(null);
 
@@ -79,8 +106,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: uploadedImage,
-          style: selectedStyle,
-          gender,
+          prompt: promptMap[gender],
         }),
       });
 
@@ -91,6 +117,20 @@ export default function Home() {
       }
 
       setGeneratedImage(data.result);
+
+      const stored = localStorage.getItem('generationRecord');
+      const now = Date.now();
+      let record: GenerationRecord;
+      
+      if (!stored) {
+        record = { count: 1, resetTime: now + ONE_HOUR };
+      } else {
+        record = JSON.parse(stored);
+        record.count += 1;
+      }
+      
+      localStorage.setItem('generationRecord', JSON.stringify(record));
+      setRemainingGenerations(checkGenerationLimit());
     } catch (err) {
       setError(err instanceof Error ? err.message : '生成失败,请重试');
     } finally {
@@ -103,7 +143,7 @@ export default function Home() {
 
     const link = document.createElement('a');
     link.href = generatedImage;
-    link.download = `证件照_${styleOptions.find(s => s.id === selectedStyle)?.name || '生成'}.png`;
+    link.download = `AI生成图像_${Date.now()}.png`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -120,9 +160,9 @@ export default function Home() {
       <header className="bg-white shadow-sm border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 py-6">
           <h1 className="text-3xl font-bold text-slate-800">
-            <span className="text-primary-600">AI</span>证件照生成器
+            <span className="text-primary-600">MT</span>证件照生成器
           </h1>
-          <p className="text-slate-500 mt-2">上传照片,AI智能生成精美证件照</p>
+          <p className="text-slate-500 mt-2">上传照片,AI根据描述生成精美图像</p>
         </div>
       </header>
 
@@ -185,47 +225,28 @@ export default function Home() {
               <div className="flex gap-4">
                 <button
                   onClick={() => setGender('male')}
-                  className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 ${
+                  className={`flex-1 py-4 px-4 rounded-xl border-2 transition-all duration-200 ${
                     gender === 'male'
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <span className="text-2xl block mb-1">👨</span>
-                  <span className="font-medium">男</span>
+                  <span className="text-3xl block mb-2">👨</span>
+                  <span className="font-medium">男士商务照</span>
+                  <p className="text-xs text-slate-500 mt-1">深蓝色背景 西装外套</p>
                 </button>
                 <button
                   onClick={() => setGender('female')}
-                  className={`flex-1 py-3 px-4 rounded-xl border-2 transition-all duration-200 ${
+                  className={`flex-1 py-4 px-4 rounded-xl border-2 transition-all duration-200 ${
                     gender === 'female'
                       ? 'border-primary-500 bg-primary-50 text-primary-700'
                       : 'border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <span className="text-2xl block mb-1">👩</span>
-                  <span className="font-medium">女</span>
+                  <span className="text-3xl block mb-2">👩</span>
+                  <span className="font-medium">女士商务照</span>
+                  <p className="text-xs text-slate-500 mt-1">深蓝色背景 职业连衣裙</p>
                 </button>
-              </div>
-            </section>
-
-            <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-              <h2 className="text-xl font-semibold text-slate-800 mb-4">3. 选择风格</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {styleOptions.map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => setSelectedStyle(style.id)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                      selectedStyle === style.id
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="text-2xl mb-1">{style.preview}</div>
-                    <div className="font-medium text-slate-800">{style.name}</div>
-                    <div className="text-xs text-slate-500 mt-1">{style.description}</div>
-                  </button>
-                ))}
               </div>
             </section>
 
@@ -237,7 +258,7 @@ export default function Home() {
 
             <button
               onClick={handleGenerate}
-              disabled={!uploadedImage || isGenerating}
+              disabled={!uploadedImage || isGenerating || remainingGenerations <= 0}
               className="w-full bg-primary-600 text-white py-4 px-6 rounded-xl font-semibold text-lg hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-primary-200"
             >
               {isGenerating ? (
@@ -249,7 +270,9 @@ export default function Home() {
                   AI生成中...
                 </span>
               ) : (
-                '✨ 开始生成证件照'
+                <span>
+                  {remainingGenerations <= 0 ? '额度已用尽' : `✨ 开始生成图像 (${remainingGenerations}/2)`}
+                </span>
               )}
             </button>
           </div>
@@ -282,7 +305,7 @@ export default function Home() {
                       className="flex-1 bg-green-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
                     >
                       <span>⬇️</span>
-                      下载证件照
+                      下载图像
                     </button>
                   </div>
                   
@@ -296,9 +319,9 @@ export default function Home() {
             <section className="bg-primary-50 rounded-2xl border border-primary-100 p-6">
               <h3 className="font-semibold text-primary-800 mb-2">💡 提示</h3>
               <ul className="text-sm text-primary-700 space-y-1">
-                <li>• 建议使用近期免冠正面照片</li>
-                <li>• 照片光线均匀,面部清晰</li>
-                <li>• 背景简单效果更好</li>
+                <li>• 上传一张参考图片</li>
+                <li>• 详细描述你想要的图像效果</li>
+                <li>• 描述越详细效果越好</li>
                 <li>• AI生成需要约10-30秒</li>
               </ul>
             </section>
@@ -308,7 +331,7 @@ export default function Home() {
 
       <footer className="border-t border-slate-200 mt-12 py-6">
         <div className="max-w-5xl mx-auto px-4 text-center text-slate-500 text-sm">
-          © 2024 AI证件照生成器 - 智能便捷的证件照制作工具
+          © 2024 MT证件照生成器 - 智能便捷的图像制作工具
         </div>
       </footer>
     </div>

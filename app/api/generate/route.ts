@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, style, gender } = await request.json();
+    const { image, prompt } = await request.json();
 
     if (!image) {
       return NextResponse.json(
@@ -11,75 +11,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.REPLICATE_API_KEY;
-    
-    if (!apiKey || apiKey === 'your_replicate_api_key_here') {
-      return NextResponse.json({
-        result: image,
-        message: 'Demo模式: 请配置 REPLICATE_API_KEY 环境变量以启用AI生成',
-      });
+    if (!prompt) {
+      return NextResponse.json(
+        { error: '请输入描述提示词' },
+        { status: 400 }
+      );
     }
 
-    const stylePrompts: Record<string, string> = {
-      'business': `Professional business attire, formal suit, white shirt, solid color background, ID photo style, ${gender === 'male' ? 'male' : 'female'} person`,
-      'casual': `Casual clothing, relaxed style, natural look, ID photo, ${gender === 'male' ? 'male' : 'female'} person`,
-      'official': `Official ID photo, formal attire, neutral expression, white or blue background, standard ID photo, ${gender === 'male' ? 'male' : 'female'} person`,
-      'smiling': `ID photo with slight smile, friendly expression, professional look, ${gender === 'male' ? 'male' : 'female'} person`,
-      'white-bg': `ID photo, white background, professional look, ${gender === 'male' ? 'male' : 'female'} person`,
-      'blue-bg': `ID photo, blue background, professional look, ${gender === 'male' ? 'male' : 'female'} person`,
-    };
+    const apiKey = process.env.VOLCENGINE_API_KEY;
 
-    const prompt = stylePrompts[style] || stylePrompts['official'];
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: '请配置 VOLCENGINE_API_KEY 环境变量' },
+        { status: 500 }
+      );
+    }
 
-    const response = await fetch('https://api.replicate.com/v1/predictions', {
+    const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        version: 'a8e40b65937cfddd460cfdb960f1a4c55a0f02b0b84b5ef6594f510b977a03f9',
-        input: {
-          prompt: prompt,
-          image: image,
-          num_inference_steps: 30,
-          guidance_scale: 7.5,
-        },
+        model: 'doubao-seedream-5-0-260128',
+        prompt: prompt,
+        image: image,
+        sequential_image_generation: 'disabled',
+        response_format: 'url',
+        size: '2K',
+        stream: false,
+        watermark: true,
       }),
     });
 
     if (!response.ok) {
-      throw new Error('AI服务请求失败');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('火山引擎API错误:', errorData);
+      throw new Error(errorData.message || 'AI服务请求失败');
     }
 
-    const prediction = await response.json();
+    const data = await response.json();
 
-    let result = image;
-    let status = prediction.status;
-    let predictionId = prediction.id;
-
-    while (status === 'starting' || status === 'processing') {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const statusResponse = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      });
-      
-      const statusData = await statusResponse.json();
-      status = statusData.status;
-      
-      if (status === 'succeeded' && statusData.output) {
-        result = statusData.output;
-      }
+    if (!data.data || !data.data[0] || !data.data[0].url) {
+      throw new Error('生成失败,未返回有效图像');
     }
+
+    const result = data.data[0].url;
 
     return NextResponse.json({ result });
   } catch (error) {
     console.error('生成错误:', error);
     return NextResponse.json(
-      { error: '生成失败,请稍后重试' },
+      { error: error instanceof Error ? error.message : '生成失败,请稍后重试' },
       { status: 500 }
     );
   }
