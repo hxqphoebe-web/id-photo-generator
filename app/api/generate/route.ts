@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const imageParam = image.startsWith('data:') ? image : image;
+
     const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
       method: 'POST',
       headers: {
@@ -36,7 +38,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: 'doubao-seedream-5-0-260128',
         prompt: prompt,
-        image: image,
+        image: imageParam,
         sequential_image_generation: 'disabled',
         response_format: 'url',
         size: '2K',
