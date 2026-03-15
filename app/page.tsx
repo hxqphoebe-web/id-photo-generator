@@ -304,11 +304,10 @@ export default function Home() {
               ) : (
                 <div className="space-y-4">
                   <div className="relative w-full aspect-[3/4] bg-slate-100 rounded-xl overflow-hidden">
-                    <Image
+                    <img
                       src={generatedImage}
                       alt="生成的证件照"
-                      fill
-                      className="object-cover"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                   
