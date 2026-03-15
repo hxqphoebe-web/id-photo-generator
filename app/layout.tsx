@@ -2,8 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'AI证件照生成器',
+  title: 'MT证件照生成器',
   description: '上传照片,AI智能生成精美证件照',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

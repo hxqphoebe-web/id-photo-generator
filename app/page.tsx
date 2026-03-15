@@ -115,6 +115,7 @@ export default function Home() {
           response_format: 'url',
           size: '2K',
           stream: false,
+          watermark: false,
         }),
       });
 
