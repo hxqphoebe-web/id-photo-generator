@@ -101,22 +101,36 @@ export default function Home() {
     setError(null);
 
     try {
-      const response = await fetch('/api/generate', {
+      const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/images/generations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_VOLCENGINE_API_KEY}`
+        },
         body: JSON.stringify({
-          image: uploadedImage,
+          model: 'doubao-seedream-5-0-260128',
           prompt: promptMap[gender],
+          image: uploadedImage,
+          sequential_image_generation: 'disabled',
+          response_format: 'url',
+          size: '2K',
+          stream: false,
+          watermark: true,
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || '生成失败,请重试');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'AI服务请求失败');
       }
 
-      setGeneratedImage(data.result);
+      const data = await response.json();
+
+      if (!data.data || !data.data[0] || !data.data[0].url) {
+        throw new Error('生成失败,未返回有效图像');
+      }
+
+      setGeneratedImage(data.data[0].url);
 
       const stored = localStorage.getItem('generationRecord');
       const now = Date.now();
