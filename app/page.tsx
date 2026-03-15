@@ -115,7 +115,6 @@ export default function Home() {
           response_format: 'url',
           size: '2K',
           stream: false,
-          watermark: true,
         }),
       });
 
@@ -176,7 +175,6 @@ export default function Home() {
           <h1 className="text-3xl font-bold text-slate-800">
             <span className="text-primary-600">MT</span>证件照生成器
           </h1>
-          <p className="text-slate-500 mt-2">上传照片,AI根据描述生成精美图像</p>
         </div>
       </header>
 
@@ -334,8 +332,7 @@ export default function Home() {
               <h3 className="font-semibold text-primary-800 mb-2">💡 提示</h3>
               <ul className="text-sm text-primary-700 space-y-1">
                 <li>• 上传一张参考图片</li>
-                <li>• 详细描述你想要的图像效果</li>
-                <li>• 描述越详细效果越好</li>
+                <li>• 选择性别（男士/女士）</li>
                 <li>• AI生成需要约10-30秒</li>
               </ul>
             </section>
