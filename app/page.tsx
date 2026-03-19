@@ -19,6 +19,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [remainingGenerations, setRemainingGenerations] = useState(2);
+  const [showAgreement, setShowAgreement] = useState(false);
+  const [agreementChecked, setAgreementChecked] = useState(false);
+  const [hasAgreed, setHasAgreed] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'upload' | 'generate' | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const checkGenerationLimit = useCallback(() => {
     const stored = localStorage.getItem('generationRecord');
@@ -42,11 +47,17 @@ export default function Home() {
 
   useEffect(() => {
     setRemainingGenerations(checkGenerationLimit());
+    const agreed = localStorage.getItem('userAgreement');
+    if (!agreed) {
+      setShowAgreement(true);
+    } else {
+      setHasAgreed(true);
+    }
   }, [checkGenerationLimit]);
 
   const promptMap = {
-    male: '生成一张现代感的职业形象照，整体风格参考商务人像。画面为上半身构图，背景使用带有轻微纹理的深蓝色渐变摄影棚背景，灯光柔和自然，突出真实肤色与层次感。画面清晰高质，面部保持对焦，背景轻微虚化以营造空间感和专业氛围，皮肤质感通透气色好，头肩比要正常适度。人物头部及五官不要有任何改变，整个脸部发型全部保留原状，服装为黑色西装外套，里面为白色衬衫，设计简约干练，整体气质现代且优雅，神情放松，自然自信，眼神明亮有神，微笑真诚。整体画面应传达干净、精致、专业的感觉，适合作为商务与职业形象照。尺寸比例1：1！不要改变五官！保持健康自信有活力的状态。',
-    female: '生成一张高智感职业证件照，背景深蓝色，生成一张现代感的职业形象照，整体风格参考商务人像。画面为上半身构图，背景使用带有轻微纹理的深蓝色渐变摄影棚背景，灯光柔和自然，突出真实肤色与层次感。画面清晰高质，面部保持对焦，背景轻微虚化以营造空间感和专业氛围，皮肤质感通透气色好，头肩比要正常适度。人物头部及五官不要有任何改变，整个脸部发型全部保留原状，服装为无袖黑色职业连衣裙，设计简约干练，整体气质现代且优雅，神情放松，自然自信，眼神明亮有神，微笑真诚。整体画面应传达干净、精致、专业的感觉，适合作为商务与职业形象照。尺寸比例1：1！不要改变五官！保持健康自信有活力的状态。',
+    male: '基于参考图生成一张1:1比例的职业证件照，要求： 1. 人物部分：**完全保留我提供照片中的发型、五官、头部姿态和面部特征，不做任何修改**，仅替换服装与背景。 2. 服装部分：穿着**深蓝色长袖职业西装，内搭白色衬衫**，商务干练。 3. 背景部分：使用**浅淡均匀的浅灰色纹理背景**。 4. 构图与光影：上半身构图，露出肩膀及以上，头肩比正常，人物居中，身体向左微侧，保持脸部直面镜头；采用柔和自然的棚拍打光，突出真实肤色与面部层次感，皮肤通透有气色，面部清晰对焦，背景轻微虚化，营造专业干净的商务氛围。 5. 神态要求：保持原照片的神情，自然自信、眼神明亮，微笑真诚，传递健康活力的专业气质。',
+    female: '基于参考图生成一张1:1比例的职业证件照，要求： 1. 人物部分：**完全保留我提供照片中的发型、五官、头部姿态和面部特征，不做任何修改**，仅替换服装与背景。 2. 服装部分：穿着**深蓝色长袖职业西装，西装不要有褶皱，内搭米白色真丝V领衬衫**，商务干练。 3. 背景部分：使用**浅淡均匀的浅灰色纹理背景**。 4. 构图与光影：上半身构图，露出肩膀及以上，头肩比正常，人物主体居中，身体向左微侧，保持脸部直面镜头；采用柔和自然的棚拍打光，突出真实肤色与面部层次感，皮肤通透有气色，面部清晰对焦，背景轻微虚化，营造专业干净的商务氛围。 5. 神态要求：保持原照片的神情，自然自信、眼神明亮，微笑真诚，传递健康活力的专业气质。',
   };
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -64,14 +75,26 @@ export default function Home() {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
-      handleFile(file);
+      if (!hasAgreed) {
+        setPendingFile(file);
+        setPendingAction('upload');
+        setShowAgreement(true);
+      } else {
+        handleFile(file);
+      }
     }
-  }, []);
+  }, [hasAgreed]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      handleFile(file);
+      if (!hasAgreed) {
+        setPendingFile(file);
+        setPendingAction('upload');
+        setShowAgreement(true);
+      } else {
+        handleFile(file);
+      }
     }
   };
 
@@ -91,6 +114,22 @@ export default function Home() {
       return;
     }
 
+    if (!hasAgreed) {
+      setPendingAction('generate');
+      setShowAgreement(true);
+    } else {
+      executeGenerate();
+    }
+  };
+
+  const handleConfirmAgreement = () => {
+    localStorage.setItem('userAgreement', 'true');
+    setHasAgreed(true);
+    setShowAgreement(false);
+    setAgreementChecked(true);
+  };
+
+  const executeGenerate = async () => {
     const remaining = checkGenerationLimit();
     if (remaining <= 0) {
       setError('额度不足，请联系管理员胡小琪充值');
@@ -331,14 +370,63 @@ export default function Home() {
             <section className="bg-primary-50 rounded-2xl border border-primary-100 p-6">
               <h3 className="font-semibold text-primary-800 mb-2">💡 提示</h3>
               <ul className="text-sm text-primary-700 space-y-1">
-                <li>• 上传一张参考图片</li>
-                <li>• 选择性别（男士/女士）</li>
-                <li>• AI生成需要约10-30秒</li>
+                <li>▪ 操作：上传一张免冠正面高清照，小于2M，需包括胸部及以上区域，光线明亮柔和，五官清晰，背景纯色干净；选择对应性别，进行生成，每人可生成2次</li>
+                <li>▪ 等待：AI生成约10-30秒，若人数较多，可能延迟，请耐心等待</li>
+                <li>▪ 反馈：若遇到技术问题，如网页无法点击，请联系Wang Xiaobing，若遇到照片生成问题，如照片无法下载，请联系Hu Xiaoqi</li>
+                <li>▪ 结果：AI生成结果存在不确定性，若对结果不满意，可进行二次尝试</li>
               </ul>
             </section>
           </div>
         </div>
       </main>
+
+      {showAgreement && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[80vh] overflow-hidden shadow-2xl">
+            <div className="p-6 border-b border-slate-200">
+              <h3 className="text-xl font-bold text-slate-800">请仔细阅读并确认</h3>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[50vh]">
+              <div className="text-sm text-slate-600 space-y-3">
+                <p>1.用户上传图片 / 提交上传行为，即视为已充分阅读、理解并不可撤销地同意：本平台有权对用户上传的图片进行必要处理，处理范围仅限于用户授权的业务场景。</p>
+                <p>2.本平台承诺：除为完成处理所必需的临时调用外，不对用户上传的图片进行永久存储、留存、备份或二次使用，处理完成后相关数据将即时清除，不用于任何其他用途。</p>
+                <p>3.本网站及相关服务将于2026 年 3 月 31 日正式下线，下线后所有相关功能、接口及数据处理服务将全部停止，不再接受图片上传及处理请求。</p>
+                <p>4.用户确认上传的图片为自身合法持有或已取得完整授权，不侵犯任何第三方肖像权、著作权、隐私权及其他合法权益；如因用户上传行为引发纠纷或法律责任，由用户自行承担。</p>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-200 bg-slate-50">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreementChecked}
+                  onChange={(e) => setAgreementChecked(e.target.checked)}
+                  className="mt-1 w-5 h-5 text-primary-600 rounded border-slate-300 focus:ring-primary-500"
+                />
+                <span className="text-sm text-slate-600">我已阅读并同意上述协议内容</span>
+              </label>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowAgreement(false);
+                    setPendingAction(null);
+                    setPendingFile(null);
+                  }}
+                  className="flex-1 py-2.5 px-4 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleConfirmAgreement}
+                  disabled={!agreementChecked}
+                  className="flex-1 py-2.5 px-4 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  确认
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="border-t border-slate-200 mt-12 py-6">
         <div className="max-w-5xl mx-auto px-4 text-center text-slate-500 text-sm">
